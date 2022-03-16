@@ -1,3 +1,4 @@
+build
 # Cache objects
 packer_cache/
 
@@ -6,3 +7,6 @@ crash.log
 
 # For built boxes
 *.box
+*.qcow2
+*.vmdk 
+*.vhdx
