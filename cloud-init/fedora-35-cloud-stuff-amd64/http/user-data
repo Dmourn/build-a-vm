@@ -1,0 +1,48 @@
+#cloud-config
+
+ssh_pwauth: false
+
+# Can't seem to get passwd expiry to work
+# this does set the password though
+#chpasswd:
+#  expire: true
+#  list:
+#    - auser:$6$OTPV4t0aVgJQpvAz$i6wbo/4POzv8BEioWqNovy.kybXIT71ndPIVToXhwgNMzgrvJmMhuxyUHYK9AQ/51yU5cDtuJjM74DCFx/iU3.
+users:
+  - name: auser
+    # plain_text_passwd: dabestpassword
+    passwd: $6$OTPV4t0aVgJQpvAz$i6wbo/4POzv8BEioWqNovy.kybXIT71ndPIVToXhwgNMzgrvJmMhuxyUHYK9AQ/51yU5cDtuJjM74DCFx/iU3.
+    # lock_passwd: true
+    # expire: true
+    groups: [sudo]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    #ssh_import_id:
+    #  - lp:not-dmourn
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - python3-devel
+  - zsh
+  - vim
+  - tmux
+
+
+# fedora needs to compile netplan from source 
+# and it's not really worth it
+#write_files:
+#  - content: | 
+#      network:
+#        ethernets:
+#          enp1s0:
+#            dhcp4: true
+#    path: /etc/netplan/config.yaml
+
+runcmd:
+  - [ sh, -c, "sudo hostnamectl set-hostname fedora-$(gpg --gen-random -a 0 4)"]
+  - [ sh, -c, "sudo systemctl enable sshd.service"]
+  - [ shutdown, now ]
+
+  

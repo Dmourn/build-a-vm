@@ -1,0 +1,104 @@
+#!/bin/bash
+
+freemem="$(( $(free -m | awk -F '\\s*' 'NR==2 {print $4}')/2 ))"
+Usage() { 
+	cat << EOF
+${0##*/} -t image.qcow2
+
+	-h/--help	show this text
+
+	Required:
+		-t/--target qcow to run
+
+	Optional:
+		-a/--arch arg -> QEMU_CMD="qemu-system-{arg}" values {x86_64, aarch64, arm}
+		-b/--boot drive for boot
+		-c/--cpus $(( $(nproc)/2 )) default=2
+		-m/--memory default= $(echo -e "\e[92m$freemem\e[0m ") MB?MiB?doyoucare?
+EOF
+}
+
+echo -e "\e[33m$freemem\e[0m"
+
+error() { 
+		Usage 
+		exit 1 
+	}
+
+short_opts="hH:b:c:m:t:a:"
+long_opts="help:,boot:,cpus:,image:,memory:,target:,arch:"
+
+#QEMU_CMD="qemu-"
+QEMU_CMD="qemu-system-"
+
+#-a|--arch) QEMU_CMD="qemu-system-${next}"; shift;;
+while [ $# -ne 0 ]; do
+	cur=${1}; next=${2};
+	case "$cur" in
+		-h|--help) Usage ; exit 0;;
+		-a|--arch) QEMU_CMD="${QEMU_CMD}${next}"; ARCH=${next}; shift;;
+		-b|--boot) boot=$next ; shift;;
+		-c|--cpus) cpus=$next ; shift;;
+		-m|--memory) memory=$next ; shift;;
+		-t|--target) target=$next ; shift;;
+	--) shift; break;;
+	esac
+	shift;
+done
+
+# if [ $# -eq 0 ] ; then Usage && exit 1 ; fi
+# [[ $# -eq 0 ]] || Usage
+
+if [[ -z $target ]] ; then error ; fi
+if [[ -z $cpus ]] ; then cpus=$(( $(nproc)/2 )) ; fi
+if [[ -z $memory ]] ; then memory=${freemem} ; fi
+
+#maybe switch the machine/qemu_cmd logic here
+#if [[ ${QEMU_CMD:12} = 'x86_64' ]]; then
+if [[ ${ARCH} = 'x86_64' ]]; then
+	MACHINE_TYPE='q35'
+	QEMU_ARGS='-enable-kvm '
+
+elif [[ ${ARCH} = 'aarch64' || ${ARCH} = 'arm' ]]; then
+	MACHINE_TYPE='virt'
+	#QEMU_ARGS=' -bios /usr/share/qemu-efi-aarch64/QEMU_EFI.fd -cpu cortex-a57 ' 
+	QEMU_ARGS=' -cpu cortex-a57 ' 
+	QEMU_ARGS+=' -pflash pflash0.img -pflash pflash1.img '
+	# QEMU_ARGS+=' -kernel kernel/ubuntu-20.04-server-cloudimg-arm64-vmlinuz-generic '
+	# QEMU_ARGS+=' -initrd initrd.img-5.4.0-107-generic '
+	KARGS='BOOT_IMAGE=/boot/vmlinuz root=LABEL=cloudimg-rootfs ds=nocloud '
+	#KARGS='root=/dev/vdb1 ds=nocloud '
+	#KARGS='BOOT_IMAGE=/ubuntu-20.04-server-cloudimg-arm64-vmlinuz-generic root=/dev/vdb15 ds=nocloud'
+	#QEMU_ARGS+=" -append 'root=/dev/vda15 ds=nocloud'  "
+else
+	echo -e "\e[1;31mSomething is wrong, abort!\e[0;0m"
+	exit 1;
+fi
+
+set -x
+if [[ -n $boot ]] ; then {
+	#qemu-system-x86_64 -enable-kvm -net nic -net user -m $memory -smp $cpus -cdrom $boot -hda $target -nographic 
+	if [[ ${QEMU_CMD:5:6} = 'system' ]]; then
+		${QEMU_CMD} -M ${MACHINE_TYPE} ${QEMU_ARGS} -net nic -net user \
+			-m "$memory" -smp "$cpus" -cdrom "$boot" -nographic \
+			-drive file="$target",format=qcow2 # -append "${KARGS}"
+
+	elif [[ ${QEMU_CMD:5:6} != 'system' ]]; then
+		${QEMU_CMD} -net nic -net user \
+			-m $memory -smp $cpus -cdrom "$boot" -hda "$target" -nographic 
+	fi
+	}
+else {
+	#qemu-system-x86_64 -enable-kvm -net nic -net user -m $memory -smp $cpus -hda $target -nographic
+	if [[ $ARCH = 'aarch64' ]]; then
+		${QEMU_CMD} -M ${MACHINE_TYPE} ${QEMU_ARGS} -net nic -net user \
+			-m "$memory" -smp "$cpus"  -nographic \
+			-drive file="$target",format=qcow2  -append "${KARGS}"
+	else
+		${QEMU_CMD} -M ${MACHINE_TYPE} ${QEMU_ARGS} -net nic -net user -m $memory -smp $cpus -hda $target -nographic
+	fi
+	# ${QEMU_CMD} -M ${MACHINE_TYPE} -net nic -net user -m $memory -smp $cpus -hda $target -display curses
+}
+fi
+
+# vi: ts=4 noexpandtab

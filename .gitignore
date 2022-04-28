@@ -1,12 +1,25 @@
-build
 # Cache objects
 packer_cache/
 
-# Crash log
-crash.log
+build
+# Dont push the kernels or initrd
+kernel/*
+initrd*
+
+# ALL logs
+*.log
+
+*.iso
 
 # For built boxes
+*.img
 *.box
 *.qcow2
 *.vmdk 
 *.vhdx
+*.raw
+*.raw.xz
+
+
+# These are basically trash files
+*.bak

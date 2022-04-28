@@ -1,0 +1,45 @@
+#cloud-config
+
+ssh_pwauth: false
+
+users:
+  - name: auser
+    # plain_text_passwd: dabestpassword
+    passwd: $6$OTPV4t0aVgJQpvAz$i6wbo/4POzv8BEioWqNovy.kybXIT71ndPIVToXhwgNMzgrvJmMhuxyUHYK9AQ/51yU5cDtuJjM74DCFx/iU3.
+    lock_passwd: false
+    chpasswd:
+      expire: true
+    # lock_passwd: true
+    # expire: true
+    groups: [sudo]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    # see cloud-init docs
+    # ssh_import_id:
+    #   - lp:not-dmourn
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - python3-dev
+  - python3-venv
+  - zsh
+  - vim
+  - tmux
+  - docker.io
+
+write_files:
+  - content: | 
+      network:
+        ethernets:
+          enp1s0:
+            dhcp4: true
+    path: /etc/netplan/config.yaml
+runcmd:
+  - [ sh, -c, "sudo hostnamectl set-hostname ubuntu-$(gpg --gen-random -a 0 4)"]
+  - [ sh, -c, "sudo systemctl enable sshd.service"]
+  - [ sh, -c, "rm /etc/netplan/5*"]
+  - [ shutdown, now ]
+
+  

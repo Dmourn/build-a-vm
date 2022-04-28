@@ -1,0 +1,83 @@
+#!/bin/bash
+
+Usage() { 
+	cat << EOF
+${0##*/} command  [ options ]
+
+Commands: { convert, run }
+
+--------------------------------------------------
+convert  -i image -t target [ options ]
+
+	Converts raw images to qcow2 and resizes the qcow
+
+		-h/--help	show this text
+
+		Required:
+			-i/--image raw image to covert to qcow2
+			-t/--target name for qcow. can be path
+
+		Optional:
+			-s/--size in GiB of qcow. default=10
+			-r/--raw raw image
+			-p/--processes number of co-routines
+--------------------------------------------------
+run -t target
+	
+	Runs a qcow2 with qemu
+
+--------------------------------------------------
+EOF
+}
+
+short_opts="hH:i:p:r:s:t:"
+long_opts="help:,image:,processes:,raw:,size:,target"
+
+getopt_out=$(getopt -n "${0##*/}" --options "$short_opts" --long "$long_opts" -- "$@") && 
+	eval set -- ${getopt_out}
+
+while [ $# -ne 0 ]; do
+	cur=${1}; next=${2};
+	case "$cur" in
+		-h|--help) Usage ; exit 0;;
+		-i|--image) image=$next ; shift;;
+		-p|--processes) processes=$next ; shift;;
+		-r|--raw) raw=$next ; shift;;
+		-s|--size) size=$next ; shift;;
+		-t|--target) target=$next ; shift;;
+	--) shift; break;;
+	esac
+	shift;
+done
+
+if [ $# -eq 0 ] ; then Usage ; fi
+
+convert() {
+	if [[ -n $raw && -n $image ]] ; then echo "specify either image for a qcow or raw.
+		probably not good to run this script on unstrusted images" ; exit 1 ; fi
+
+	if [[ -z $size ]] ; then size=10 ; fi
+	if [[ -z $processes ]] ; then processes=8 ; fi
+
+	if [[ -n $raw ]] ; then 
+		qemu-img convert -m "$processes" -f raw -O qcow2 "$raw" "$target"
+	fi
+
+	if [[ -n $image ]] ; then 
+		qemu-img convert -p -m "$processes" -O qcow2 -f qcow2 "$image" "$target" 
+		qemu-img resize -f qcow2 "$target" "${size}"G
+	fi
+
+	if [[ -e $target ]]; then
+		cat << EOF 
+		$(qemu-img info "$target")
+
+EOF
+	fi
+}
+
+
+[[ ${1} = "convert" ]] && convert
+
+
+# vi: ts=4 noexpandtab
